@@ -10,5 +10,4 @@ cl -EHsc /MD -O2 -Zi^
     /SUBSYSTEM:CONSOLE
 IF EXIST *.ilk del *.ilk
 IF EXIST *.obj del *.obj
-IF EXIST vc140.pdb del vc140.pdb
 popd
