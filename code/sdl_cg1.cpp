@@ -183,8 +183,10 @@ int main(int argc, char *argv[])
     while(isRunning)
     {
         SDL_Event event;
-        SDL_WaitEvent(&event);
-        isRunning = HandleEvent(event);
+        while(SDL_PollEvent(&event))
+        {
+            isRunning = HandleEvent(event);            
+        }
         
         canvas->Clear(Color{ 0, 0, 0, 255 });
         canvas->SetPixel(400, 300, Color{ 255, 255, 255, 255 });
