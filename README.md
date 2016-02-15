@@ -1,6 +1,5 @@
 # CG1
 This is a project for the exercises of the course Computer Graphics.
-****
 ## Build process
 #### Windows
 ##### Setup
