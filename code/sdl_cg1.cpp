@@ -1,8 +1,67 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <iostream>
 
 #include <GL/glew.h> // Later for OpenGL
 #include <SDL.h>
+
+class Clock
+{
+private:
+    Uint64  performanceFrequency;
+    Uint64  current;
+    Uint64  last;
+    float   fixed;
+    float   accumulator;
+
+public:
+    Clock(float fps)
+    {
+        this->performanceFrequency = SDL_GetPerformanceFrequency();
+        this->current = SDL_GetPerformanceCounter();
+        this->last = this->current;
+        this->fixed = 1.0 / fps;
+        this->accumulator = 0.0;
+    }
+    
+    bool Accumulating()
+    {
+        return (this->accumulator >= this->fixed);
+    }
+    
+    void Accumulate()
+    {
+        this->accumulator -= this->fixed;
+    }
+    
+    float Delta()
+    {
+        this->performanceFrequency = SDL_GetPerformanceFrequency();
+        this->current = SDL_GetPerformanceCounter();
+        Uint64 counterDelta = this->current - this->last;
+
+        float delta = (((1000.0f * (float) counterDelta) / (float) performanceFrequency));
+        if (delta > this->fixed)
+            delta = this->fixed;
+        float fps = (float) performanceFrequency / (float) counterDelta;
+
+        printf("%.10f ms/f, %.10f f/s\n", delta, fps);
+        this->last = this->current;
+        this->accumulator += delta;
+        
+        return delta;
+    }
+    
+    void Start()
+    {
+        this->last =  SDL_GetPerformanceCounter();
+    }
+    
+    float InterpolationAlpha()
+    {
+        return (this->accumulator / this->fixed);
+    }
+};
 
 struct Color
 {
@@ -87,9 +146,11 @@ public:
       
       inline void SwapBuffers()
       {
-        // Nodig? //this->pitch = this->width * this->bytesPerPixel;
         if (SDL_UpdateTexture(this->texture, 0, this->memory, this->pitch))
+        {
             std::cout << "Could not update texture." << std::endl;
+            return;   
+        }
         
         SDL_RenderCopy(this->renderer, texture, 0, 0);
         SDL_RenderPresent(this->renderer);
@@ -154,7 +215,9 @@ int main(int argc, char *argv[])
                           SDL_WINDOWPOS_UNDEFINED,
                           800,
                           600,
-                          SDL_WINDOW_SHOWN | /*SDL_WINDOW_RESIZABLE |*/ 
+                          SDL_WINDOW_SHOWN |
+                          /*SDL_WINDOW_RESIZABLE |*/ 
+                          SDL_RENDERER_PRESENTVSYNC |
                           SDL_WINDOW_INPUT_FOCUS);
     if (!window)
     {
@@ -180,12 +243,24 @@ int main(int argc, char *argv[])
     
     // Main loop
     bool isRunning = true;
+    float dt = 0.0;
+    Clock clock(60);
+    clock.Start();
+    
     while(isRunning)
     {
+        dt = clock.Delta();
+        
         SDL_Event event;
         while(SDL_PollEvent(&event))
         {
             isRunning = HandleEvent(event);            
+        }
+        
+        while (clock.Accumulating())
+        {
+            // Fixed stuff
+            clock.Accumulate();
         }
         
         canvas->Clear(Color{ 0, 0, 0, 255 });
