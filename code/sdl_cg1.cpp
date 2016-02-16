@@ -1,9 +1,12 @@
+#include <cmath>
 #include <stdlib.h>
 #include <stdio.h>
 #include <iostream>
 
 #include <GL/glew.h> // Later for OpenGL
 #include <SDL.h>
+
+#include "math/line.h"
 
 class Clock
 {
@@ -24,17 +27,17 @@ public:
         this->accumulator = 0.0;
     }
     
-    bool Accumulating()
+    inline bool Accumulating()
     {
         return (this->accumulator >= this->fixed);
     }
     
-    void Accumulate()
+    inline void Accumulate()
     {
         this->accumulator -= this->fixed;
     }
     
-    float Delta()
+    inline float Delta()
     {
         this->performanceFrequency = SDL_GetPerformanceFrequency();
         this->current = SDL_GetPerformanceCounter();
@@ -45,19 +48,19 @@ public:
             delta = this->fixed;
         float fps = (float) performanceFrequency / (float) counterDelta;
 
-        printf("%.10f ms/f, %.10f f/s\n", delta, fps);
+        //printf("%.10f ms/f, %.10f f/s\n", delta, fps);
         this->last = this->current;
         this->accumulator += delta;
         
         return delta;
     }
     
-    void Start()
+    inline void Start()
     {
         this->last =  SDL_GetPerformanceCounter();
     }
     
-    float InterpolationAlpha()
+    inline float InterpolationAlpha()
     {
         return (this->accumulator / this->fixed);
     }
@@ -110,6 +113,9 @@ public:
           delete[] this->memory;
           SDL_DestroyTexture(texture);
       }
+      
+      inline int GetWidth() { return this->width; }
+      inline int GetHeight() { return this->height; }
       
       inline void SetPixel(int x, int y, const Color& color)
       {
@@ -176,7 +182,16 @@ public:
     
     inline void SetPixel(int x, int y, const Color& color)
     {
-        this->backbuffer->SetPixel(x, y, color);         
+        const int width = this->backbuffer->GetWidth();
+        const int height = this->backbuffer->GetHeight();
+        
+        const int xPos = x + (width / 2);
+        const int yPos = (height / 2) - y;
+        
+        if (xPos > 0 && yPos > 0 && xPos < width && yPos < height)
+        {
+            this->backbuffer->SetPixel(xPos, yPos, color);
+        }
     }
 
     inline void Clear(const Color& color)
@@ -192,6 +207,107 @@ public:
     inline void SwapBuffers()
     {
         this->backbuffer->SwapBuffers();
+    }
+    
+    
+    void DrawDDALine(const Line& line, const Color& color)
+    {
+        // From course:
+        const float m = ((float)(line.y1 - line.y0)) / (line.x1 - line.x0);
+        float y = line.y0;
+        
+        for(int x = line.x0; x <= line.x1; ++x)
+        {
+            this->SetPixel(x, (int) floor(y + 0.5), color);
+            y += m;
+        }
+    }
+    
+    void DrawMidPointLine(const Line& line, const Color& color)
+    {
+        // From course:
+        int dy = line.y1 - line.y0;
+        int dx = line.x1 - line.x0;        
+        int d = dy * 2 - dx;
+        int incrE = dy * 2;
+        int incrNE = (dy - dx) * 2;
+        int y = line.y0;
+        
+        for(int x = line.x0; x <= line.x1; ++x)
+        {
+            if (d <= 0)
+            {
+                d += incrE;
+            }
+            else
+            {
+                d += incrNE;
+                y++;    
+            }
+            this->SetPixel(x, y, color);
+        }
+    }
+    
+    void DrawAllCirclePoints(int xMid, int yMid, int x, int y, const Color& color)
+    {
+       this->SetPixel(xMid + x, yMid + y, color);
+	   this->SetPixel(xMid + y, yMid + x, color);
+	   this->SetPixel(xMid + y, yMid - x, color);
+	   this->SetPixel(xMid + x, yMid - y, color);
+	   this->SetPixel(xMid - x, yMid - y, color);
+	   this->SetPixel(xMid - y, yMid - x, color);
+	   this->SetPixel(xMid - y, yMid + x, color);
+	   this->SetPixel(xMid - x, yMid + y, color);   
+    }
+    
+    void DrawMidPointCircle(int xMid, int yMid, int radius, const Color& color)
+    {
+        int d = 1 - radius;
+        int y = radius;
+        
+        for (int x = 0; x < y; ++x)
+        {
+            if (d < 0)
+            {
+                d += x * 2 + 3;
+            }
+            else
+            {
+                d += (x - y) * 2 + 5;
+                y--;      
+            }
+            
+            DrawAllCirclePoints(xMid, yMid, x, y, color); 
+        }
+    }
+    
+    void DrawSecondOrderMidPointCircle(int xMid, int yMid, int radius, const Color& color)
+    {
+        int d = 1 - radius;
+        int y = radius;
+        int deltaE = 3;
+        int deltaSE = 5 - radius * 2;
+        
+        for (int x = 0; x < y; ++x)
+        {
+            if (d < 0)
+            {
+                // Select E
+                d += deltaE;
+                deltaE += 2;
+                deltaSE += 2;
+            }
+            else
+            {
+                // Select SE
+                d += deltaSE;
+                deltaE += 2;
+                deltaSE += 4;
+                y--;      
+            }
+            
+            DrawAllCirclePoints(xMid, yMid, x, y, color); 
+        }
     }
 };
 
@@ -264,7 +380,11 @@ int main(int argc, char *argv[])
         }
         
         canvas->Clear(Color{ 0, 0, 0, 255 });
-        canvas->SetPixel(400, 300, Color{ 255, 255, 255, 255 });
+        canvas->SetPixel(-100, 100, Color{ 255, 255, 255, 255 });
+        Line line(-200, -200, -100, -100);
+        canvas->DrawMidPointLine(line, Color{ 0, 255, 255, 255 });        
+        canvas->DrawMidPointCircle(200, 200, 20, Color{ 255, 255, 0, 255 });
+        canvas->DrawSecondOrderMidPointCircle(0, 0, 100, Color{ 255, 0, 255, 255 });        
         canvas->SwapBuffers();
     }
 
