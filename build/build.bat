@@ -8,6 +8,6 @@ cl -EHsc /MD -O2 -Zi^
     /LIBPATH:..\deps\sdl\libs\ SDL2.lib SDL2main.lib^
     /LIBPATH:..\deps\glew\libs\ glew32.lib^
     /SUBSYSTEM:CONSOLE
-IF EXIST *.ilk del *.ilk
-IF EXIST *.obj del *.obj
+REM IF EXIST *.ilk del *.ilk
+REM IF EXIST *.obj del *.obj
 popd

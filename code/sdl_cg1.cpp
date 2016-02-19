@@ -74,110 +74,172 @@ struct Color
     unsigned char a;
 };
 
-class BackBuffer
+struct SDLWindowDimension
 {
- private:
-      SDL_Renderer*     renderer;   
-      SDL_Texture*      texture;
-      unsigned char*    memory;
-      int               width;
-      int               height;
-      int               pitch;
-      int               bytesPerPixel;
+    int width;
+    int height;
+};
+
+class SDLWindow
+{
+    friend class SDLRenderer;
+private:
+    SDL_Window* window;
+    char* title;
+    int width;
+    int height;
+    bool isFullscreen;
+    
+public:
+    SDLWindow(char* title, int width, int height, bool isFullscreen)
+        : title(title), width(width), height(height), isFullscreen(isFullscreen)
+    {
+    }
+    
+    bool Init()
+    {
+        if(SDL_InitSubSystem(SDL_INIT_VIDEO) != 0)
+        {
+            return false;
+        }
+        
+        atexit(SDL_Quit);
+        
+        this->window = SDL_CreateWindow("Computer Graphics",
+                          SDL_WINDOWPOS_UNDEFINED,
+                          SDL_WINDOWPOS_UNDEFINED,
+                          this->width,
+                          this->height,
+                          SDL_WINDOW_SHOWN |
+                          /*SDL_WINDOW_RESIZABLE |*/
+                          (this->isFullscreen ? SDL_WINDOW_FULLSCREEN : 0) |  
+                          SDL_RENDERER_PRESENTVSYNC |
+                          SDL_WINDOW_INPUT_FOCUS);
+        return (this->window != nullptr);
+    }
+    
+    void Shutdown()
+    {
+        SDL_DestroyWindow(this->window);
+    }
+
+    SDLWindowDimension GetWindowDimension()
+    {
+        SDLWindowDimension result;
+        SDL_GetWindowSize(this->window, &result.width, &result.height);
+        return result;  
+    }
+};
+
+class SDLBackBuffer
+{
+private:  
+    SDL_Texture*      texture;
+    unsigned char*    memory;
+    int               width;
+    int               height;
+    int               pitch;
+    int               bytesPerPixel;
 
 public:  
-      BackBuffer(SDL_Renderer* renderer, const int width, const int height)
-      {
-          this->renderer = renderer;
-          this->texture = SDL_CreateTexture(
+    SDLBackBuffer(SDL_Renderer* renderer, const int width, const int height)
+    {
+        this->texture = SDL_CreateTexture(
             renderer,
             SDL_PIXELFORMAT_ARGB8888,
             SDL_TEXTUREACCESS_STREAMING,
             width,
-            height);
-    
-          if(!texture)
-          {
-            std::cout << "Could not create frontbuffer: " 
-                  << SDL_GetError() << std::endl;
-          }
-          this->bytesPerPixel = 4;
-          this->pitch = width * bytesPerPixel;
-          this->memory = new unsigned char[this->pitch * height];
-          this->width = width;
-          this->height = height;
-      }
-      
-      ~BackBuffer()
-      {
-          delete[] this->memory;
-          SDL_DestroyTexture(texture);
-      }
-      
-      inline int GetWidth() { return this->width; }
-      inline int GetHeight() { return this->height; }
-      
-      inline void SetPixel(int x, int y, const Color& color)
-      {
-          const int index = (x + y*this->width) * this->bytesPerPixel;
-          this->memory[index] = color.b;
-          this->memory[index + 1] = color.g;
-          this->memory[index + 2] = color.r;
-          this->memory[index + 3] = color.a;          
-      }
-      
-      void Clear(const Color& color)
-      {
-          const int columns = this->width * this->bytesPerPixel;
-          const int rows = this->height;
-          
-          for (int i = 0; i < rows; ++i)
-          {
-              for (int j = 0; j < columns; j += this->bytesPerPixel)
-              {
-                  // Format: BGRA
-                  const int index = i*columns + j;
-                  this->memory[index] = color.b;
-                  this->memory[index + 1] = color.g;
-                  this->memory[index + 2] = color.r;
-                  this->memory[index + 3] = color.a;  
-              }
-          }
-      }
-      
-      void Resize()
-      {
-          
-      }
-      
-      inline void SwapBuffers()
-      {
-        if (SDL_UpdateTexture(this->texture, 0, this->memory, this->pitch))
+            height);    
+        
+        if (!this->texture)
         {
-            std::cout << "Could not update texture." << std::endl;
-            return;   
+            std::cout << "Could not create frontbuffer: " 
+                << SDL_GetError() << std::endl;
         }
         
-        SDL_RenderCopy(this->renderer, texture, 0, 0);
-        SDL_RenderPresent(this->renderer);
-      }
+        this->bytesPerPixel = 4;
+        this->pitch = width * bytesPerPixel;
+        this->memory = new unsigned char[this->pitch * height];
+        this->width = width;
+        this->height = height;
+    }
+      
+    ~SDLBackBuffer()
+    {
+        delete[] this->memory;
+        SDL_DestroyTexture(texture);
+    }
+      
+    inline int GetWidth() { return this->width; }
+    inline int GetHeight() { return this->height; }
+    
+    inline void SetPixel(int x, int y, const Color& color)
+    {
+        const int index = (x + y*this->width) * this->bytesPerPixel;
+        this->memory[index] = color.b;
+        this->memory[index + 1] = color.g;
+        this->memory[index + 2] = color.r;
+        this->memory[index + 3] = color.a;          
+    }
+    
+    void Clear(const Color& color)
+    {
+        const int columns = this->width * this->bytesPerPixel;
+        const int rows = this->height;
+        
+        for (int i = 0; i < rows; ++i)
+        {
+            for (int j = 0; j < columns; j += this->bytesPerPixel)
+            {
+                // Format: BGRA
+                const int index = i*columns + j;
+                this->memory[index] = color.b;
+                this->memory[index + 1] = color.g;
+                this->memory[index + 2] = color.r;
+                this->memory[index + 3] = color.a;  
+            }
+        }
+    }
+    
+    void Resize()
+    {
+        
+    }
+    
+    inline void SwapBuffers(SDL_Renderer* renderer)
+    {
+      SDL_UpdateTexture(this->texture, 0, this->memory, this->pitch);
+      SDL_RenderCopy(renderer, texture, 0, 0);
+      SDL_RenderPresent(renderer);
+    }
 };
 
-class Canvas
+class SDLRenderer
 {
 private:
-    BackBuffer* backbuffer;
+    SDLWindow*      window;
+    SDL_Renderer*   renderer;
+    SDLBackBuffer*  backbuffer;
     // TODO: scanbuffer? edgetable? ...
     
 public:
-    Canvas(SDL_Renderer* renderer, const int width, const int height)
-        : backbuffer(new BackBuffer(renderer, width, height))
+    SDLRenderer(SDLWindow* window)
+        : window(window)
     {
     }
     
-    ~Canvas()
+    bool Init()
+    {
+        this->renderer = SDL_CreateRenderer(this->window->window, -1, SDL_RENDERER_SOFTWARE);
+        SDLWindowDimension dimension = this->window->GetWindowDimension();
+        this->backbuffer = new SDLBackBuffer(this->renderer, dimension.width, dimension.height);
+        return (this->renderer != nullptr);
+    }
+    
+    void Shutdown()
     {
         delete backbuffer;
+        SDL_DestroyRenderer(this->renderer);
     }
     
     inline void SetPixel(int x, int y, const Color& color)
@@ -206,7 +268,7 @@ public:
     
     inline void SwapBuffers()
     {
-        this->backbuffer->SwapBuffers();
+        this->backbuffer->SwapBuffers(this->renderer);
     }
     
     
@@ -248,7 +310,7 @@ public:
         }
     }
     
-    void DrawAllCirclePoints(int xMid, int yMid, int x, int y, const Color& color)
+    inline void DrawAllCirclePoints(int xMid, int yMid, int x, int y, const Color& color)
     {
        this->SetPixel(xMid + x, yMid + y, color);
 	   this->SetPixel(xMid + y, yMid + x, color);
@@ -311,51 +373,29 @@ public:
     }
 };
 
-
 bool HandleEvent(const SDL_Event& event);
 
 int main(int argc, char *argv[])
-{
-    // Initialize SDL
-    if (SDL_Init(SDL_INIT_VIDEO) != 0)
-    {
-	   std::cout << "Error: SDL could not initialize! " 
-                 << SDL_GetError() << std::endl;
-       std::cin.get();
-       return 1;
-    }
-    
+{   
     // Initialize Window
-    SDL_Window* window = SDL_CreateWindow("Computer Graphics",
-                          SDL_WINDOWPOS_UNDEFINED,
-                          SDL_WINDOWPOS_UNDEFINED,
-                          800,
-                          600,
-                          SDL_WINDOW_SHOWN |
-                          /*SDL_WINDOW_RESIZABLE |*/ 
-                          SDL_RENDERER_PRESENTVSYNC |
-                          SDL_WINDOW_INPUT_FOCUS);
-    if (!window)
+    SDLWindow* window = new SDLWindow("Computer Graphics", 800, 600, false);
+    if (!window->Init())
     {
-        std::cout << "Could not create window: " 
-                  << SDL_GetError() << std::endl;
+        std::cout << "Could not create window." << std::endl;
+        delete window;
         return 1;
     }
-    
-    int width = 0, height = 0;
-    SDL_GetWindowSize(window, &width, &height);
     
     // Initialize software renderer
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
-    
-    if (!renderer)
+    SDLRenderer* renderer = new SDLRenderer(window);
+    if (!renderer->Init())
     {
-        std::cout << "Could not create software renderer: " 
-                  << SDL_GetError() << std::endl;
+        std::cout << "Could not create renderer." << std::endl;
+        delete renderer;
+        window->Shutdown();
+        delete window;
         return 1;
     }
-    
-    Canvas* canvas = new Canvas(renderer, width, height);
     
     // Main loop
     bool isRunning = true;
@@ -379,20 +419,20 @@ int main(int argc, char *argv[])
             clock.Accumulate();
         }
         
-        canvas->Clear(Color{ 0, 0, 0, 255 });
-        canvas->SetPixel(-100, 100, Color{ 255, 255, 255, 255 });
+        renderer->Clear(Color{ 0, 0, 0, 255 });
+        renderer->SetPixel(-100, 100, Color{ 255, 255, 255, 255 });
         Line line(-200, -200, -100, -100);
-        canvas->DrawMidPointLine(line, Color{ 0, 255, 255, 255 });        
-        canvas->DrawMidPointCircle(200, 200, 20, Color{ 255, 255, 0, 255 });
-        canvas->DrawSecondOrderMidPointCircle(0, 0, 100, Color{ 255, 0, 255, 255 });        
-        canvas->SwapBuffers();
+        renderer->DrawMidPointLine(line, Color{ 0, 255, 255, 255 });        
+        renderer->DrawMidPointCircle(200, 200, 20, Color{ 255, 255, 0, 255 });
+        renderer->DrawSecondOrderMidPointCircle(0, 0, 100, Color{ 255, 0, 255, 255 });        
+        renderer->SwapBuffers();
     }
 
     // Shutdown
-    delete canvas;
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    renderer->Shutdown();
+    delete renderer;
+    window->Shutdown();
+    delete window;
     
 	return 0;
 }
