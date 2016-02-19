@@ -8,7 +8,7 @@
 
 #include "math/line.h"
 
-class Clock
+class SDLClock
 {
 private:
     Uint64  performanceFrequency;
@@ -18,7 +18,7 @@ private:
     float   accumulator;
 
 public:
-    Clock(float fps)
+    SDLClock(float fps)
     {
         this->performanceFrequency = SDL_GetPerformanceFrequency();
         this->current = SDL_GetPerformanceCounter();
@@ -27,7 +27,7 @@ public:
         this->accumulator = 0.0;
     }
     
-    inline bool Accumulating()
+    inline bool Accumulating() const
     {
         return (this->accumulator >= this->fixed);
     }
@@ -42,12 +42,10 @@ public:
         this->performanceFrequency = SDL_GetPerformanceFrequency();
         this->current = SDL_GetPerformanceCounter();
         Uint64 counterDelta = this->current - this->last;
-
         float delta = (((1000.0f * (float) counterDelta) / (float) performanceFrequency));
         if (delta > this->fixed)
             delta = this->fixed;
         float fps = (float) performanceFrequency / (float) counterDelta;
-
         //printf("%.10f ms/f, %.10f f/s\n", delta, fps);
         this->last = this->current;
         this->accumulator += delta;
@@ -57,10 +55,10 @@ public:
     
     inline void Start()
     {
-        this->last =  SDL_GetPerformanceCounter();
+        this->last = SDL_GetPerformanceCounter();
     }
     
-    inline float InterpolationAlpha()
+    inline float InterpolationAlpha() const
     {
         return (this->accumulator / this->fixed);
     }
@@ -98,13 +96,9 @@ public:
     
     bool Init()
     {
-        if(SDL_InitSubSystem(SDL_INIT_VIDEO) != 0)
-        {
-            return false;
-        }
-        
         atexit(SDL_Quit);
-        
+        if(SDL_InitSubSystem(SDL_INIT_VIDEO) != 0)
+            return false;
         this->window = SDL_CreateWindow("Computer Graphics",
                           SDL_WINDOWPOS_UNDEFINED,
                           SDL_WINDOWPOS_UNDEFINED,
@@ -118,12 +112,12 @@ public:
         return (this->window != nullptr);
     }
     
-    void Shutdown()
+    void Shutdown() const
     {
         SDL_DestroyWindow(this->window);
     }
 
-    SDLWindowDimension GetWindowDimension()
+    SDLWindowDimension GetWindowDimension() const
     {
         SDLWindowDimension result;
         SDL_GetWindowSize(this->window, &result.width, &result.height);
@@ -150,13 +144,11 @@ public:
             SDL_TEXTUREACCESS_STREAMING,
             width,
             height);    
-        
         if (!this->texture)
         {
             std::cout << "Could not create frontbuffer: " 
                 << SDL_GetError() << std::endl;
         }
-        
         this->bytesPerPixel = 4;
         this->pitch = width * bytesPerPixel;
         this->memory = new unsigned char[this->pitch * height];
@@ -170,10 +162,10 @@ public:
         SDL_DestroyTexture(texture);
     }
       
-    inline int GetWidth() { return this->width; }
-    inline int GetHeight() { return this->height; }
+    inline int GetWidth() const { return this->width; }
+    inline int GetHeight() const { return this->height; }
     
-    inline void SetPixel(int x, int y, const Color& color)
+    inline void SetPixel(const int x, const int y, const Color& color)
     {
         const int index = (x + y*this->width) * this->bytesPerPixel;
         this->memory[index] = color.b;
@@ -206,7 +198,7 @@ public:
         
     }
     
-    inline void SwapBuffers(SDL_Renderer* renderer)
+    inline void SwapBuffers(SDL_Renderer* renderer) const
     {
       SDL_UpdateTexture(this->texture, 0, this->memory, this->pitch);
       SDL_RenderCopy(renderer, texture, 0, 0);
@@ -236,13 +228,13 @@ public:
         return (this->renderer != nullptr);
     }
     
-    void Shutdown()
+    void Shutdown() const
     {
         delete backbuffer;
         SDL_DestroyRenderer(this->renderer);
     }
     
-    inline void SetPixel(int x, int y, const Color& color)
+    inline void SetPixel(const int x, const int y, const Color& color) const
     {
         const int width = this->backbuffer->GetWidth();
         const int height = this->backbuffer->GetHeight();
@@ -256,7 +248,7 @@ public:
         }
     }
 
-    inline void Clear(const Color& color)
+    inline void Clear(const Color& color) const
     {
         this->backbuffer->Clear(color);
     }
@@ -266,7 +258,7 @@ public:
         
     }
     
-    inline void SwapBuffers()
+    inline void SwapBuffers() const
     {
         this->backbuffer->SwapBuffers(this->renderer);
     }
@@ -310,7 +302,7 @@ public:
         }
     }
     
-    inline void DrawAllCirclePoints(int xMid, int yMid, int x, int y, const Color& color)
+    inline void DrawAllCirclePoints(const int xMid, const int yMid, const int x, const int y, const Color& color)
     {
        this->SetPixel(xMid + x, yMid + y, color);
 	   this->SetPixel(xMid + y, yMid + x, color);
@@ -322,7 +314,7 @@ public:
 	   this->SetPixel(xMid - x, yMid + y, color);   
     }
     
-    void DrawMidPointCircle(int xMid, int yMid, int radius, const Color& color)
+    void DrawMidPointCircle(const int xMid, const int yMid, const int radius, const Color& color)
     {
         int d = 1 - radius;
         int y = radius;
@@ -343,7 +335,7 @@ public:
         }
     }
     
-    void DrawSecondOrderMidPointCircle(int xMid, int yMid, int radius, const Color& color)
+    void DrawSecondOrderMidPointCircle(const int xMid, const int yMid, const int radius, const Color& color)
     {
         int d = 1 - radius;
         int y = radius;
@@ -400,7 +392,7 @@ int main(int argc, char *argv[])
     // Main loop
     bool isRunning = true;
     float dt = 0.0;
-    Clock clock(60);
+    SDLClock clock(60);
     clock.Start();
     
     while(isRunning)
@@ -421,7 +413,7 @@ int main(int argc, char *argv[])
         
         renderer->Clear(Color{ 0, 0, 0, 255 });
         renderer->SetPixel(-100, 100, Color{ 255, 255, 255, 255 });
-        Line line(-200, -200, -100, -100);
+        const Line line(-200, -200, -100, -100);
         renderer->DrawMidPointLine(line, Color{ 0, 255, 255, 255 });        
         renderer->DrawMidPointCircle(200, 200, 20, Color{ 255, 255, 0, 255 });
         renderer->DrawSecondOrderMidPointCircle(0, 0, 100, Color{ 255, 0, 255, 255 });        
