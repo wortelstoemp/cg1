@@ -263,18 +263,71 @@ public:
         this->backbuffer->SwapBuffers(this->renderer);
     }
     
+    void DrawLine(const Line& line, const Color& color)
+    {
+        this->DrawDDALine(line, color);
+    }
     
     void DrawDDALine(const Line& line, const Color& color)
-    {
-        // From course:
-        const float m = ((float)(line.y1 - line.y0)) / (line.x1 - line.x0);
-        float y = line.y0;
+    {   
+        float m = ((float)(line.y1 - line.y0)) / (line.x1 - line.x0);
         
-        for(int x = line.x0; x <= line.x1; ++x)
+        if (line.x0 <= line.x1)
         {
-            this->SetPixel(x, (int) floor(y + 0.5), color);
-            y += m;
+            if (m > 1)
+            {
+                m = 1.0f / m;
+                float x = line.x0;
+                for(int y = line.y0; y <= line.y1; ++y, x += m)
+                    this->SetPixel((int) floor(x + 0.5), y, color);
+            }
+            else if (m < -1)
+            {
+                m = 1.0f / m;
+                float x = line.x0;
+                for(int y = line.y0; y >= line.y1; --y, x -= m)
+                    this->SetPixel((int) floor(x - 0.5), y, color);
+            }
+            else
+            {
+                float y = line.y0;
+                for(int x = line.x0; x <= line.x1; ++x, y += m)
+                    this->SetPixel(x, (int) floor(y + 0.5), color);
+            }
         }
+        else
+        {
+            if (m > 1)
+            {
+                m = 1.0f / m;
+                float x = line.x0;
+                for(int y = line.y0; y >= line.y1; --y, x -= m)
+                    this->SetPixel((int) floor(x - 0.5), y, color);
+            }
+            else if (m < -1)
+            {
+                m = 1.0f / m;
+                float x = line.x0;
+                for(int y = line.y0; y <= line.y1; ++y, x += m)
+                    this->SetPixel((int) floor(x + 0.5), y, color);
+            }
+            else
+            {
+                float y = line.y1;
+                for(int x = line.x1; x <= line.x0; ++x, y += m)
+                    this->SetPixel(x, (int) floor(y + 0.5), color);    
+            }
+        }
+        
+        // From course:
+        // const float m = ((float)(line.y1 - line.y0)) / (line.x1 - line.x0);
+        // float y = line.y0;
+        // 
+        // for(int x = line.x0; x <= line.x1; ++x)
+        // {
+        //     this->SetPixel(x, (int) floor(y + 0.5), color);
+        //     y += m;
+        // }
     }
     
     void DrawMidPointLine(const Line& line, const Color& color)
@@ -413,10 +466,14 @@ int main(int argc, char *argv[])
         
         renderer->Clear(Color{ 0, 0, 0, 255 });
         renderer->SetPixel(-100, 100, Color{ 255, 255, 255, 255 });
-        const Line line(-200, -200, -100, -100);
-        renderer->DrawMidPointLine(line, Color{ 0, 255, 255, 255 });        
-        renderer->DrawMidPointCircle(200, 200, 20, Color{ 255, 255, 0, 255 });
-        renderer->DrawSecondOrderMidPointCircle(0, 0, 100, Color{ 255, 0, 255, 255 });        
+        const float radius = 100.0f;
+        static float radians = 0.0f;
+        const Line line(0, 0, radius * cos(radians), radius * sin(radians));
+        renderer->DrawLine(line, Color{ 0, 255, 255, 255 });
+        radians += dt * 0.05f;
+        radians = radians >= 360.0f ? 0.0f : radians;        
+        // renderer->DrawMidPointCircle(200, 200, 20, Color{ 255, 255, 0, 255 });
+        // renderer->DrawSecondOrderMidPointCircle(0, 0, 100, Color{ 255, 0, 255, 255 });        
         renderer->SwapBuffers();
     }
 
