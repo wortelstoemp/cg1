@@ -179,6 +179,7 @@ public:
         const int columns = this->width * this->bytesPerPixel;
         const int rows = this->height;
         
+		#pragma omp parallel for
         for (int i = 0; i < rows; ++i)
         {
             for (int j = 0; j < columns; j += this->bytesPerPixel)
@@ -212,6 +213,7 @@ private:
     SDLWindow*      window;
     SDL_Renderer*   renderer;
     SDLBackBuffer*  backbuffer;
+	int*			scanbuffer;
     // TODO: scanbuffer? edgetable? ...
     
 public:
@@ -223,14 +225,17 @@ public:
     bool Init()
     {
         this->renderer = SDL_CreateRenderer(this->window->window, -1, SDL_RENDERER_SOFTWARE);
-        SDLWindowDimension dimension = this->window->GetWindowDimension();
+        const SDLWindowDimension dimension = this->window->GetWindowDimension();
         this->backbuffer = new SDLBackBuffer(this->renderer, dimension.width, dimension.height);
-        return (this->renderer != nullptr);
+        this->scanbuffer = new int[dimension.height * 2];
+		
+		return (this->renderer != nullptr);
     }
     
     void Shutdown() const
     {
-        delete backbuffer;
+		delete this->scanbuffer;
+        delete this->backbuffer;
         SDL_DestroyRenderer(this->renderer);
     }
     
@@ -242,11 +247,33 @@ public:
         const int xPos = x + (width / 2);
         const int yPos = (height / 2) - y;
         
+		// TODO remove if clipping for lines and polygons works
         if (xPos > 0 && yPos > 0 && xPos < width && yPos < height)
         {
             this->backbuffer->SetPixel(xPos, yPos, color);
         }
     }
+	
+	inline void SetScanBuffer(const int y, const int xMin, const int xMax)
+	{
+		this->scanbuffer[y * 2] = xMin;
+		this->scanbuffer[(y * 2) + 1] = xMax;	
+	}
+	
+	void FillShape(const int yMin, const int yMax)
+	{
+		int xMin, xMax;
+		for (int y = yMax; y >= yMin; y--)
+		{
+			xMin = scanbuffer[y * 2];
+			xMax = scanbuffer[(y * 2) + 1];
+			
+			for(int x = xMin; x < xMax; x++)
+			{
+				this->SetPixel(x, y, Color{ 255, 255, 255, 255 });
+			}		
+		}
+	}
 
     inline void Clear(const Color& color) const
     {
@@ -465,16 +492,24 @@ int main(int argc, char *argv[])
         }
         
         renderer->Clear(Color{ 0, 0, 0, 255 });
-        renderer->SetPixel(-100, 100, Color{ 255, 255, 255, 255 });
+        //renderer->SetPixel(-100, 100, Color{ 255, 255, 255, 255 });
         const float radius = 100.0f;
         static float radians = 0.0f;
         const Line line(0, 0, radius * cos(radians), radius * sin(radians));
         renderer->DrawLine(line, Color{ 0, 255, 255, 255 });
         radians += dt * 0.05f;
-        radians = radians >= 360.0f ? 0.0f : radians;        
+        radians = radians >= 360.0f ? 0.0f : radians;     
         // renderer->DrawMidPointCircle(200, 200, 20, Color{ 255, 255, 0, 255 });
         // renderer->DrawSecondOrderMidPointCircle(0, 0, 100, Color{ 255, 0, 255, 255 });        
-        renderer->SwapBuffers();
+        
+		for (int y = 100; y < 200; y++)
+		{
+			renderer->SetScanBuffer(y, -200, -100);
+		}
+		
+		renderer->FillShape(100, 200);
+		
+		renderer->SwapBuffers();
     }
 
     // Shutdown

@@ -1,11 +1,11 @@
 #pragma once
 
+template<typename T>
 struct Vec2
 {
-    float x;
-    float y;
+    T x, y;
     
-    Vec2() : x(0.0), y(0.0) {}
-    Vec2(float x, float y): x(x), y(y) {}  
-    virtual ~Vec2() {}
+    Vec2(T x = 0, T y = 0)
+		: x(x), y(y)
+	{}
 };
